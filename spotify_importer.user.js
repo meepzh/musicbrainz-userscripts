@@ -135,6 +135,7 @@ function parseRelease(data) {
         format: 'Digital Media'
     });
 
+    console.log('release', release);
     return release;
 }
 
@@ -184,41 +185,20 @@ function insertLink(release) {
     });
 }
 
-const send = XMLHttpRequest.prototype.send;
-
-function sendReplacement(data) {
-    /** It seems that the spotify code tweaks the send event,
-     *  so hooking to the onreadystatechange event.
-     */
-    if (this.onreadystatechange) {
-        this._onreadystatechange = this.onreadystatechange;
-    }
-    this.onreadystatechange = onReadyStateChangeReplacement;
-    return send.apply(this, arguments);
-}
-
-function onReadyStateChangeReplacement() {
-    let wsUrl = 'https://api.spotify.com/v1/albums/',
-        target = arguments[0].target;
-    if (target.responseURL.startsWith(wsUrl) && target.readyState == 4) {
-        raw_release_data = JSON.parse(target.responseText);
-        if (target.status !== 200) {
-            LOGGER.error(raw_release_data);
-            insertErrorMessage(raw_release_data);
-        } else {
-            let release = parseRelease(raw_release_data);
-            insertLink(release);
-        }
-    }
-
-    if (this._onreadystatechange) {
-        return this._onreadystatechange.apply(this, arguments);
-    }
-}
-
-// Hook XMLHttpRequest to use the data fetched from the api by the web-player.
-window.XMLHttpRequest.prototype.send = sendReplacement;
-
 $(document).ready(function() {
-    MBImportStyle();
+    $.ajax({
+        url: "https://open.spotify.com/get_access_token?reason=transport&productType=web_player"
+    }).done(function(auth_data) {
+        $.ajax({
+            url: "https://api.spotify.com/v1/albums/" + window.location.pathname.split("/").pop(),
+            headers: {Authorization: "Bearer " + auth_data.accessToken}
+        }).done(function(album_data) {
+            let release = parseRelease(album_data);
+            insertLink(release);
+        }).fail(function(jqXHR, textStatus) {
+          console.error("Album request failed: " + textStatus);
+        });
+    }).fail(function(jqXHR, textStatus) {
+      console.error("Access token request failed: " + textStatus);
+    });
 });
