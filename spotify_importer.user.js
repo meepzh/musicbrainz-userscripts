@@ -135,7 +135,6 @@ function parseRelease(data) {
         format: 'Digital Media'
     });
 
-    console.log('release', release);
     return release;
 }
 
